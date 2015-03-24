@@ -1,0 +1,30 @@
+{
+  "name": "chip8.js",
+  "version": "1.0.0",
+  "description": "CHIP-8 emulator",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/karma/bin/karma start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jffjs/chip8.js.git"
+  },
+  "keywords": [
+    "emulator",
+    "chip-8",
+    "chip8"
+  ],
+  "author": "Jeff Smith",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jffjs/chip8.js/issues"
+  },
+  "homepage": "https://github.com/jffjs/chip8.js",
+  "devDependencies": {
+    "jasmine-core": "^2.2.0",
+    "karma": "^0.12.31",
+    "karma-chrome-launcher": "^0.1.7",
+    "karma-jasmine": "^0.3.5"
+  }
+}
