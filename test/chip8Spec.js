@@ -28,6 +28,11 @@ describe("CHIP-8", function() {
         expect(chip8.memory[i]).toEqual(fontSet[i]);
       }
     });
+
+    it("resets timers", function() {
+      expect(chip8.delayTimer).toEqual(0);
+      expect(chip8.soundTimer).toEqual(0);
+    });
   });
 
   describe("load", function() {
@@ -45,6 +50,40 @@ describe("CHIP-8", function() {
       for(var i = 0; i < buffer.byteLength; i++) {
         expect(chip8.memory[i + 512]).toEqual(buffer[i]);
       }
+    });
+  });
+
+  describe("emulateCycle", function() {
+    it("fetches the next opcode from memory", function() {
+      chip8.memory[0x200] = 0x13;
+      chip8.memory[0x201] = 0xFF;
+      chip8.emulateCycle();
+      expect(chip8.opcode).toEqual(0x13FF);
+    });
+
+    it("updates timers", function() {
+      chip8.delayTimer = 60;
+      chip8.soundTimer = 10;
+      chip8.emulateCycle();
+      expect(chip8.delayTimer).toEqual(59);
+      expect(chip8.soundTimer).toEqual(9);
+    });
+
+    describe("opcode ANNN", function() {
+      beforeEach(function() {
+        chip8.memory[0x200] = 0xA1;
+        chip8.memory[0x201] = 0x23;
+      });
+
+      it("sets index register to NNN", function() {
+        chip8.emulateCycle();
+        expect(chip8.I).toEqual(0x123);
+      });
+
+      it("increments program counter", function() {
+        chip8.emulateCycle();
+        expect(chip8.pc).toEqual(0x202);
+      });
     });
   });
 });

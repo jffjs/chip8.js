@@ -48,6 +48,10 @@ function Chip8() {
     for (var i = 0; i < 80; i++) {
       this.memory[i] = fontSet[i];
     }
+
+    // Reset timers
+    this.delayTimer = 0;
+    this.soundTimer = 0;
   };
 
   /**
@@ -73,10 +77,42 @@ function Chip8() {
 
   this.emulateCycle = function() {
     // Fetch opcode
-    // Decode opcode
-    // Execute opcode
+    this.opcode = this.memory[this.pc] << 8 | this.memory[this.pc + 1];
+
+    // Decode and execute opcode
+    switch (this.opcode & 0xF000) {
+      case 0x0000: 
+        switch (this.opcode & 0x000F) {
+          case 0x0000: // 00E0: Clears the screen
+            // TODO
+            break;
+          case 0x000E: // 00EE: Returns from subroutine
+            // TODO
+            break;
+          default:
+            console.error("Unknown opcode: " + this.opcode);
+        }
+        break;
+      case 0xA000: // ANNN: Sets I to the address NNN
+        this.I = this.opcode & 0x0FFF;
+        this.pc += 2;
+        break;
+      default:
+        console.error("Unknown opcode: " + this.opcode);
+        
+    }
     
     // Update timers
+    if (this.delayTimer > 0) {
+      --this.delayTimer;
+    }
+
+    if (this.soundTimer > 0) {
+      if (this.soundTimer === 1) {
+        console.log('BEEP!');
+      }
+      --this.soundTimer;
+    }
   };
 
   this.run = function() {
