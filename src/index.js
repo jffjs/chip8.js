@@ -22,6 +22,7 @@ var fontSet = new Uint8Array([
  * @constructor
  */
 function Chip8() {
+  var maxStack = 16;
   this.opcode     = 0;                    // 2 bytes
   this.I          = 0;                    // Index register 
   this.pc         = 0;                    // program counter
@@ -80,25 +81,154 @@ function Chip8() {
     this.opcode = this.memory[this.pc] << 8 | this.memory[this.pc + 1];
 
     // Decode and execute opcode
-    switch (this.opcode & 0xF000) {
+    var opcode = this.opcode;
+    switch (opcode & 0xF000) {
       case 0x0000: 
-        switch (this.opcode & 0x000F) {
+        switch (opcode & 0x000F) {
           case 0x0000: // 00E0: Clears the screen
             // TODO
             break;
+
           case 0x000E: // 00EE: Returns from subroutine
-            // TODO
+            if (this.sp > 0) this.sp--;
+            this.pc = this.stack[this.sp] + 2;
             break;
+
           default:
-            console.error("Unknown opcode: " + this.opcode);
+            console.error("Unknown opcode: " + opcode);
         }
         break;
+
+      case 0x1000: // 1NNN: Jumps to address at NNN
+        this.pc = opcode & 0x0FFF;
+        break;
+
+      case 0x2000: // 2NNN: Calls subroutine at NNN
+        if (this.sp === maxStack) {
+          console.error('Stack limit exceeded!');
+          return;
+        }
+        this.stack[this.sp] = this.pc;
+        this.sp++;
+        this.pc = opcode & 0x0FFF;
+        break;
+
+      case 0x3000: // 3XNN: Skips the next instruction if VX equals NN
+        if (this.V[(opcode & 0x0F00) >> 8] === (opcode & 0x00FF)) {
+          this.pc += 4;
+        } else {
+          this.pc += 2;
+        }
+        break;
+
+      case 0x4000: // 4XNN: Skips the next instruction if VX does not equal NN
+        if (this.V[(opcode & 0x0F00) >> 8] !== (opcode & 0x00FF)) {
+          this.pc += 4;
+        } else {
+          this.pc += 2;
+        }
+        break;
+
+      case 0x5000: // 5XY0: Skips the next instruction if VX equals VY
+        if (this.V[(opcode & 0x0F00) >> 8] === this.V[(opcode & 0x00F0) >> 4]) {
+          this.pc += 4;
+        } else {
+          this.pc += 2;
+        }
+        break;
+
+      case 0x6000: // 6XNN: Sets VX to NN
+        this.V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
+        this.pc += 2;
+        break;
+
+      case 0x7000: // 7XNN: Adds NN to VX
+        // TODO: should carry flag be set here?
+        if (this.V[(opcode & 0x0F00) >> 8] + (opcode & 0x00FF) > 0xFF) {
+          this.V[0xF] = 1;
+        } else {
+          this.V[0xF] = 0;
+        }
+
+        this.V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
+        this.pc +=2;
+        break;
+        
+      case 0x8000:
+        switch (opcode & 0x000F) {
+          case 0x0000: // 8XY0: Sets VX to the value of VY.
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0001: // 8XY1: Sets VX to VX OR VY.
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x0F00) >> 8] | this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0002: // 8XY2: Sets VX to VX AND VY.
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x0F00) >> 8] & this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0003: // 8XY3: Sets VX to VX XOR VY.
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x0F00) >> 8] ^ this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0004: // 8XY4: Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+            if (this.V[(opcode & 0x0F00) >> 8] + this.V[(opcode & 0x00F0) >> 4] > 0xFF) {
+              this.V[0xF] = 1;
+            } else {
+              this.V[0xF] = 0;
+            }
+            this.V[(opcode & 0x0F00) >> 8] += this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0005: // 8XY5: VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+            if (this.V[(opcode & 0x0F00) >> 8] - this.V[(opcode & 0x00F0) >> 4] < 0) {
+              this.V[0xF] = 1;
+            } else {
+              this.V[0xF] = 0;
+            }
+            this.V[(opcode & 0x0F00) >> 8] -= this.V[(opcode & 0x00F0) >> 4];
+            this.pc +=2;
+            break;
+
+          case 0x0006: // 8XY6: Shifts VX right by one. VF is set to the value of the least significant bit of VX before the shift.
+            this.V[0xF] = this.V[(opcode & 0x0F00) >> 8] & 0x01;
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x0F00) >> 8] >> 1;
+            this.pc +=2;
+            break;
+
+          case 0x0007: // 8XY7: Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+            if (this.V[(opcode & 0x00F0) >> 4] - this.V[(opcode & 0x0F00) >> 8] < 0) {
+              this.V[0xF] = 1;
+            } else {
+              this.V[0xF] = 0;
+            }
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x00F0) >> 4] - this.V[(opcode & 0x0F00) >> 8];
+            this.pc +=2;
+            break;
+
+          case 0x000E: // 8XYE: Shifts VX left by one. VF is set to the value of the most significant bit of VX before the shift.
+            this.V[0xF] = this.V[(opcode & 0x0F00) >> 8] >> 7;
+            this.V[(opcode & 0x0F00) >> 8] = this.V[(opcode & 0x0F00) >> 8] << 1;
+            this.pc +=2;
+            break;
+
+          default:
+            console.error("Unknown opcode: " + opcode);
+        }
+        break;
+        
       case 0xA000: // ANNN: Sets I to the address NNN
-        this.I = this.opcode & 0x0FFF;
+        this.I = opcode & 0x0FFF;
         this.pc += 2;
         break;
       default:
-        console.error("Unknown opcode: " + this.opcode);
+        console.error("Unknown opcode: " + opcode);
         
     }
     
