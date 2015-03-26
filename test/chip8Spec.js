@@ -54,9 +54,10 @@ describe("CHIP-8", function() {
   });
 
   describe("emulateCycle", function() {
-    function setOpcode(opcode) {
-      chip8.memory[0x200] = (opcode & 0xFF00) >> 8;
-      chip8.memory[0x201] = opcode & 0x00FF;
+    function setOpcode(opcode, address) {
+      address = address || 0x200;
+      chip8.memory[address] = (opcode & 0xFF00) >> 8;
+      chip8.memory[address + 1] = opcode & 0x00FF;
     };
 
     it("fetches the next opcode from memory", function() {
@@ -214,7 +215,7 @@ describe("CHIP-8", function() {
           expect(chip8.V[0]).toEqual(0x44 + 0x11);
         });
 
-        it("sets carry flag (VF) if overflow", function() {
+        xit("sets carry flag (VF) if overflow", function() {
           setOpcode(0x70FF);
           chip8.V[0] = 0xFF;
           chip8.emulateCycle();
@@ -468,11 +469,289 @@ describe("CHIP-8", function() {
       });
 
       describe("0xCXNN", function() {
+        beforeEach(function() {
+          setOpcode("0xC0AB");
+        });
+
         it("sets VX to a random number masked by NN", function() {
           spyOn(Math, 'random').and.returnValue(0.5);
-          setOpcode("0xC0AB");
           chip8.emulateCycle();
           expect(chip8.V[0]).toEqual(0x2B);
+        });
+
+        it("increments program counter", function() {
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xDXYN", function() {
+        beforeEach(function() {
+          chip8.I = 0x400;
+
+          // Sprite
+          chip8.memory[0x400] = 0x3C;  // 00111100
+          chip8.memory[0x401] = 0xC3;  // 11000011
+          chip8.memory[0x402] = 0xFF;  // 11111111
+        });
+
+        it("draws sprite from address I and of height N to (VX, VY)", function() {
+          setOpcode("0xD013");
+          chip8.V[0] = 8;
+          chip8.V[1] = 0;
+          chip8.emulateCycle();
+          // first spots are still empty
+          expect(chip8.gfx.subarray(0,8)).toEqual(     new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0]));
+          // sprite
+          expect(chip8.gfx.subarray(8,16)).toEqual(    new Uint8Array([0, 0, 1, 1, 1, 1, 0, 0]));
+          expect(chip8.gfx.subarray(72, 80)).toEqual(  new Uint8Array([1, 1, 0, 0, 0, 0, 1, 1]));
+          expect(chip8.gfx.subarray(136, 144)).toEqual(new Uint8Array([1, 1, 1, 1, 1, 1, 1, 1]));
+        });
+
+        it("sets VF to 1 if drawing causes a collision (pixel is toggled from on to off)", function() {
+          // draw first sprite
+          setOpcode("0xD013");
+          chip8.V[0] = 8;
+          chip8.V[1] = 0;
+          chip8.emulateCycle();
+          expect(chip8.V[0xF]).toEqual(0);
+          
+          // draw second sprite
+          setOpcode("0xD233", 0x202);
+          chip8.V[2] = 1;
+          chip8.V[3] = 0;
+          chip8.emulateCycle();
+          expect(chip8.V[0xF]).toEqual(1);
+        });
+
+        it("increments program counter", function() {
+          setOpcode("0xD013");
+          chip8.V[0] = 8;
+          chip8.V[1] = 0;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xEX9E", function() {
+        beforeEach(function() {
+          setOpcode(0xE89E);
+          chip8.V[8] = 0xF;
+        });
+
+        it("skips next instruction if key in VX is pressed", function() {
+          chip8.key[0xF] = 1;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x204);
+        });
+
+        it("increments program counter as normal if key in VX is not pressed", function() {
+          chip8.key[0xF] = 0;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xEXA1", function() {
+        beforeEach(function() {
+          setOpcode(0xE5A1);
+          chip8.V[5] = 0xA;
+        });
+
+        it("skips next instruction if key in VX is not pressed", function() {
+          chip8.key[0xA] = 0;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x204);
+        });
+
+        it("increments program counter as normal if key in VX is pressed", function() {
+          chip8.key[0xA] = 1;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX07", function() {
+        beforeEach(function() {
+          setOpcode(0xF107);
+          chip8.delayTimer = 0xF0;
+        });
+
+        it("sets VX to the value of delay timer", function() {
+          chip8.emulateCycle();
+          expect(chip8.V[1]).toEqual(0xF0);
+        });
+
+        it("increments program counter", function() {
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX0A", function() {
+        beforeEach(function() {
+          setOpcode(0xF20A);
+        });
+
+        it("awaits keypress and stores in VX", function() {
+          chip8.key[0xA] = 1;
+          chip8.emulateCycle();
+          expect(chip8.V[2]).toEqual(0xA);
+          expect(chip8.pc).toEqual(0x202);
+        });
+
+        it("waits if no key is pressed", function() {
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x200);
+        });
+      });
+
+      describe("0xFX15", function() {
+        beforeEach(function() {
+          setOpcode(0xF315);
+          chip8.V[3] = 0xBB;
+          chip8.emulateCycle();
+        });
+        
+        it("sets delay timer to VX", function() {
+          expect(chip8.delayTimer).toEqual(0xBB - 1);
+        });
+
+        it("increments program counter", function() {
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX18", function() {
+        beforeEach(function() {
+          setOpcode(0xF418);
+          chip8.V[4] = 0xBB;
+          chip8.emulateCycle();
+        });
+        
+        it("sets sound timer to VX", function() {
+          expect(chip8.soundTimer).toEqual(0xBB - 1);
+        });
+
+        it("increments program counter", function() {
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX1E", function() {
+        beforeEach(function() {
+          setOpcode(0xF51E);
+          chip8.V[5] = 0x4A;
+          chip8.I = 0x400;
+        });
+
+        it("adds VX to I", function() {
+          chip8.emulateCycle();
+          expect(chip8.I).toEqual(0x400 + 0x4A);
+        });
+
+        it("sets carry flag (VF) on overflow", function() {
+          chip8.I = 0xFFF;
+          chip8.emulateCycle();
+          expect(chip8.V[0xF]).toEqual(1);
+          expect(chip8.I).toEqual(0x49);
+        });
+
+        it("increments program counter", function() {
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX29", function() {
+        beforeEach(function() {
+          setOpcode(0xF629);
+          chip8.V[6] = 0xB;
+          chip8.emulateCycle();
+        });
+
+        it("sets I to the address of the character in VX", function() {
+          expect(chip8.I).toEqual(0x37);
+        });
+
+        it("increments program counter", function() {
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX33", function() {
+        beforeEach(function() {
+          setOpcode(0xF733);
+          chip8.I = 0x400;
+        });
+
+        it("saves the binary-coded decimal representation of the number in VX to addresses I, I+1, and I+2", function() {
+          chip8.V[7] = 243;
+          chip8.emulateCycle();
+          expect(chip8.memory[chip8.I]).toEqual(2);
+          expect(chip8.memory[chip8.I + 1]).toEqual(4);
+          expect(chip8.memory[chip8.I + 2]).toEqual(3);
+
+          chip8.V[7] = 25;
+          setOpcode(0xF733, 0x202);
+          chip8.emulateCycle();
+          expect(chip8.memory[chip8.I]).toEqual(0);
+          expect(chip8.memory[chip8.I + 1]).toEqual(2);
+          expect(chip8.memory[chip8.I + 2]).toEqual(5);
+
+          chip8.V[7] = 8;
+          setOpcode(0xF733, 0x204);
+          chip8.emulateCycle();
+          expect(chip8.memory[chip8.I]).toEqual(0);
+          expect(chip8.memory[chip8.I + 1]).toEqual(0);
+          expect(chip8.memory[chip8.I + 2]).toEqual(8);
+        });
+
+        it("increments program counter", function() {
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX55", function() {
+        beforeEach(function() {
+          setOpcode(0xF255);
+          chip8.I = 0x400;
+          chip8.V[0] = 0x11;
+          chip8.V[1] = 0x22;
+          chip8.V[2] = 0x33;
+          chip8.emulateCycle();
+        });
+
+        it("stores V0 to VX in memory starting at address I", function() {
+          expect(chip8.memory[chip8.I]).toEqual(0x11);
+          expect(chip8.memory[chip8.I + 1]).toEqual(0x22);
+          expect(chip8.memory[chip8.I + 2]).toEqual(0x33);
+        });
+
+        it("increments program counter", function() {
+          expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xFX65", function() {
+        beforeEach(function() {
+          setOpcode(0xF265);
+          chip8.I = 0x400;
+          chip8.memory[0x400] = 0x11;
+          chip8.memory[0x401] = 0x22;
+          chip8.memory[0x402] = 0x33;
+          chip8.emulateCycle();
+        });
+
+        it("fills V0 to VX with values from memory starting at address I", function() {
+          expect(chip8.V[0]).toEqual(0x11);
+          expect(chip8.V[1]).toEqual(0x22);
+          expect(chip8.V[2]).toEqual(0x33);
+        });
+
+        it("increments program counter", function() {
+          expect(chip8.pc).toEqual(0x202);
         });
       });
     });
