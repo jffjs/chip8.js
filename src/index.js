@@ -223,10 +223,27 @@ function Chip8() {
         }
         break;
         
+      case 0x9000: // 9XY0: Skips the next instruction if VX doesn't equal VY. 
+        if (this.V[(opcode & 0x0F00) >> 8] !== this.V[(opcode & 0x00F0) >> 4]) {
+          this.pc += 4;
+        } else {
+          this.pc += 2;
+        }
+        break;
+
       case 0xA000: // ANNN: Sets I to the address NNN
         this.I = opcode & 0x0FFF;
         this.pc += 2;
         break;
+
+      case 0xB000: // BNNN: Jumps to the address NNN plus V0.
+        this.pc = (opcode & 0x0FFF) + this.V[0];
+        break;
+
+      case 0xC000: // CXNN: Sets VX to a random number, masked by NN.
+        this.V[(opcode & 0x0F00) >> 8] = Math.floor(Math.random() * 0xFF) & (opcode & 0x00FF);
+        break;
+
       default:
         console.error("Unknown opcode: " + opcode);
         

@@ -421,6 +421,27 @@ describe("CHIP-8", function() {
         });
       });
 
+      describe("0x9XY0", function() {
+        beforeEach(function() {
+          setOpcode(0x9010);
+        });
+        
+        it("skips next instruction when VX != VY", function() {
+          chip8.V[0] = 0x44;
+          chip8.V[1] = 0x45;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x204);
+        });
+
+        it("increments program counter as normal when VX == VY", function() {
+          chip8.V[0] = 0x44;
+          chip8.V[1] = 0x44;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x202);
+        });
+        
+      });
+
       describe("0xANNN", function() {
         beforeEach(function() {
           setOpcode(0xA123);
@@ -434,6 +455,24 @@ describe("CHIP-8", function() {
         it("increments program counter", function() {
           chip8.emulateCycle();
           expect(chip8.pc).toEqual(0x202);
+        });
+      });
+
+      describe("0xBNNN", function() {
+        it("sets program counter to NNN plus value of V0", function() {
+          setOpcode(0xB300);
+          chip8.V[0] = 0x20;
+          chip8.emulateCycle();
+          expect(chip8.pc).toEqual(0x300 + 0x20);
+        });
+      });
+
+      describe("0xCXNN", function() {
+        it("sets VX to a random number masked by NN", function() {
+          spyOn(Math, 'random').and.returnValue(0.5);
+          setOpcode("0xC0AB");
+          chip8.emulateCycle();
+          expect(chip8.V[0]).toEqual(0x2B);
         });
       });
     });
