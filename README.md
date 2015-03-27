@@ -12,23 +12,23 @@ Start a browser-based emulator:
 
 
 ```html
-    <html>
-        <head>
-            <script src="main.js"></script>
-        </head>
-        <body>
-            <canvas id="emu-canvas" width="640" height="320"></canvas>
-        </body>
-    </html>
+<html>
+    <head>
+        <script src="main.js"></script>
+    </head>
+    <body>
+        <canvas id="emu-canvas" width="640" height="320"></canvas>
+    </body>
+</html>
 ```
 
 ```javascript
-    window.onload = function() {
-      var Chip8 = require('chip8.js'),
-          romBuffer = new Uint8Array(/* ROM data... */),
-          emulator = new Chip8.emulator('emu-canvas', romBuffer);
-      emulator.run();
-    }
+window.onload = function() {
+  var Chip8 = require('chip8.js'),
+      romBuffer = new Uint8Array(/* ROM data... */),
+      emulator = new Chip8.emulator('emu-canvas', romBuffer);
+  emulator.run();
+}
 ```
 
 ## Run Example
