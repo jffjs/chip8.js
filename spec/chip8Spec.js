@@ -1,3 +1,5 @@
+var Chip8 = require('../lib/chip8');
+
 describe("CHIP-8", function() {
   var chip8;
   
@@ -24,6 +26,7 @@ describe("CHIP-8", function() {
     });
 
     it("loads font set into memory", function() {
+      var fontSet = require('../lib/font');
       for(var i = 0; i < fontSet.length; i++) {
         expect(chip8.memory[i]).toEqual(fontSet[i]);
       }
