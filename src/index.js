@@ -21,7 +21,9 @@ var fontSet = new Uint8Array([
  * CHIP-8 Emulator
  * @constructor
  */
-function Chip8() {
+function Chip8(canvas) {
+  this.canvas = document.getElementById(canvas);
+
   var maxStack = 16;
   this.drawFlag   = false;
   this.opcode     = 0;                    // 2 bytes
@@ -67,15 +69,18 @@ function Chip8() {
   };
 
   this.draw = function() {
-    console.log(this.gfx);
-    var line = "";
+    var ctx = this.canvas.getContext("2d");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, 640, 320);
+
+    ctx.fillStyle = "#FFF";
     for (var y = 0; y < 32; y++) {
       for (var x = 0; x < 64; x++) {
-        line += this.gfx[x + (y * 64)];
+        if (this.gfx[x + (y * 64)]) {
+          ctx.fillRect(x * 10, y * 10, 10, 10);
+        }
       }
-      line += "\n";
     }
-    console.log(line);
   };
 
   this.setKeys = function() {
@@ -91,12 +96,16 @@ function Chip8() {
     var i;
     switch (opcode & 0xF000) {
       case 0x0000: 
-        switch (opcode & 0x000F) {
-          case 0x0000: // 00E0: Clears the screen
-            // TODO
+        switch (opcode & 0x00FF) {
+          case 0x00E0: // 00E0: Clears the screen
+            this.drawFlag = true;
+            for (i = 0; i < (64 * 32); i++) {
+              this.gfx[i] = 0;
+            }
+            this.pc += 2;
             break;
 
-          case 0x000E: // 00EE: Returns from subroutine
+          case 0x00EE: // 00EE: Returns from subroutine
             if (this.sp > 0) this.sp--;
             this.pc = this.stack[this.sp] + 2;
             break;
@@ -373,22 +382,12 @@ function Chip8() {
         
     }
     
-    // Update timers
-    if (this.delayTimer > 0) {
-      --this.delayTimer;
-    }
-
-    if (this.soundTimer > 0) {
-      if (this.soundTimer === 1) {
-        console.log('BEEP!');
-      }
-      --this.soundTimer;
-    }
   };
 
   this.run = function() {
     var loop = function() {
-      for(var i = 0; i < 10; i++) {
+      for(var i = 0; i < 20; i++) {
+        this.drawFlag = false;
         this.emulateCycle();
 
         if (this.drawFlag) {
@@ -397,10 +396,84 @@ function Chip8() {
 
         this.setKeys();
       }
+
+      // Update timers
+      if (this.delayTimer > 0) {
+        --this.delayTimer;
+      }
+
+      if (this.soundTimer > 0) {
+        if (this.soundTimer === 1) {
+          console.log('BEEP!');
+        }
+        --this.soundTimer;
+      }
       window.requestAnimationFrame(loop);
     }.bind(this);
 
     window.requestAnimationFrame(loop);
   };
+
+  var keyListener = function(toggle) {
+    return function(e) {
+      var k = 99;
+      switch (e.which) {
+        case 49:
+          k = 1;
+          break;
+        case 50:
+          k = 2;
+          break;
+        case 51:
+          k = 3;
+          break;
+        case 52:
+          k = 0xC;
+          break;
+        case 81:
+          k = 4;
+          break;
+        case 87:
+          k = 5;
+          break;
+        case 69:
+          k = 6;
+          break;
+        case 82:
+          k = 0xD;
+          break;
+        case 65:
+          k = 7;
+          break;
+        case 83:
+          k = 8;
+          break;
+        case 68:
+          k = 9;
+          break;
+        case 70:
+          k = 0xE;
+          break;
+        case 90:
+          k = 0xA;
+          break;
+        case 88:
+          k = 0;
+          break;
+        case 67:
+          k = 0xB;
+          break;
+        case 86:
+          k = 0xF;
+          break;
+      }
+      if (k < 16) {
+        this.key[k] = toggle;
+      }
+    }.bind(this);
+  }.bind(this);
+
+  document.onkeydown = keyListener(1);
+  document.onkeyup = keyListener(0);
 }
 

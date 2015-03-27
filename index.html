@@ -1,8 +1,33 @@
 <html>
   <head>
     <script src="src/index.js"></script>
+    <script>
+     window.onload = function() {
+       var fileInput = document.getElementById('rom');
+       fileInput.addEventListener('change', function(e) {
+         var rom = fileInput.files[0];
+         var reader = new FileReader();
+         reader.onload = function() {
+           var buffer = new Uint8Array(reader.result);
+           console.log(buffer);
+           chip8 = new Chip8('chip8');
+           chip8.load(buffer);
+           chip8.run();
+         }
+         reader.readAsArrayBuffer(rom);
+       });
+
+       //chip8 = new Chip8('chip8');
+       //chip8.initialize();
+     };
+    </script>
   </head>
 
   <body>
+    <div>
+      Upload CHIP-8 ROM: 
+      <input type="file" id="rom">
+    </div>
+    <canvas id="chip8" width="640" height="320"></canvas>
   </body>
 </html>
